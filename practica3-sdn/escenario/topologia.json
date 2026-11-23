@@ -1,5 +1,4 @@
 {
-  "base": "10.31",
   "ospf": false,
   "puerto_web": 3000,
   "repo": "https://github.com/gisai/SSR-master-server.git",
@@ -7,85 +6,85 @@
   "modo_gateway": "nat-unprotected",
   "redes": {
     "vlan100_servidor": {
-      "prefijo": "10.31.100.0/24",
-      "descripcion": "LAN del servidor (CPD)",
+      "prefijo": "10.0.0.0/24",
+      "descripcion": "LAN del servidor (servidor-R1)",
       "etiqueta": "LAN-servidor-VLAN100",
       "tipo": "lan",
       "vlan": 100,
       "bridge": "br-vlan100",
-      "gateway_docker": "10.31.100.254"
+      "gateway_docker": "10.0.0.254"
     },
     "enlace_r1_r2": {
-      "prefijo": "10.31.255.0/29",
+      "prefijo": "10.0.1.0/24",
       "descripcion": "Enlace R1-R2",
       "etiqueta": "enlace-R1-R2",
       "tipo": "enlace",
       "vlan": null,
-      "bridge": "br-r1-r2",
-      "gateway_docker": "10.31.255.6"
+      "bridge": "br-enlace12",
+      "gateway_docker": "10.0.1.254"
     },
     "enlace_r2_r3": {
-      "prefijo": "10.31.255.8/29",
+      "prefijo": "10.0.2.0/24",
       "descripcion": "Enlace R2-R3",
       "etiqueta": "enlace-R2-R3",
       "tipo": "enlace",
       "vlan": null,
-      "bridge": "br-r2-r3",
-      "gateway_docker": "10.31.255.14"
+      "bridge": "br-enlace23",
+      "gateway_docker": "10.0.2.254"
     },
     "enlace_r2_r4": {
-      "prefijo": "10.31.255.16/29",
+      "prefijo": "10.0.3.0/24",
       "descripcion": "Enlace R2-R4",
       "etiqueta": "enlace-R2-R4",
       "tipo": "enlace",
       "vlan": null,
-      "bridge": "br-r2-r4",
-      "gateway_docker": "10.31.255.22"
+      "bridge": "br-enlace24",
+      "gateway_docker": "10.0.3.254"
     },
     "vlan10_red1": {
-      "prefijo": "10.31.10.0/24",
+      "prefijo": "192.168.1.0/24",
       "descripcion": "RED 1",
       "etiqueta": "RED1-VLAN10",
       "tipo": "lan",
       "vlan": 10,
       "bridge": "br-vlan10",
-      "gateway_docker": "10.31.10.254"
+      "gateway_docker": "192.168.1.254"
     },
     "vlan20_red2": {
-      "prefijo": "10.31.20.0/24",
+      "prefijo": "192.168.2.0/24",
       "descripcion": "RED 2",
       "etiqueta": "RED2-VLAN20",
       "tipo": "lan",
       "vlan": 20,
       "bridge": "br-vlan20",
-      "gateway_docker": "10.31.20.254"
+      "gateway_docker": "192.168.2.254"
     },
     "vlan30_red3": {
-      "prefijo": "10.31.30.0/24",
+      "prefijo": "192.168.3.0/24",
       "descripcion": "RED 3",
       "etiqueta": "RED3-VLAN30",
       "tipo": "lan",
       "vlan": 30,
       "bridge": "br-vlan30",
-      "gateway_docker": "10.31.30.254"
+      "gateway_docker": "192.168.3.254"
     },
     "vlan40_red4": {
-      "prefijo": "10.31.40.0/24",
+      "prefijo": "192.168.4.0/24",
       "descripcion": "RED 4",
       "etiqueta": "RED4-VLAN40",
       "tipo": "lan",
       "vlan": 40,
       "bridge": "br-vlan40",
-      "gateway_docker": "10.31.40.254"
+      "gateway_docker": "192.168.4.254"
     },
     "gestion": {
-      "prefijo": "10.31.200.0/24",
+      "prefijo": "10.0.200.0/24",
       "descripcion": "Red de gestion (fluentd), no enrutada",
       "etiqueta": "gestion",
       "tipo": "gestion",
       "vlan": null,
       "bridge": "br-gestion",
-      "gateway_docker": "10.31.200.254"
+      "gateway_docker": "10.0.200.254"
     }
   },
   "routers": {
@@ -93,45 +92,45 @@
       "rol": "router del servidor",
       "router_id": "1.1.1.1",
       "interfaces": {
-        "vlan100_servidor": "10.31.100.1",
-        "enlace_r1_r2": "10.31.255.1"
+        "vlan100_servidor": "10.0.0.1",
+        "enlace_r1_r2": "10.0.1.1"
       },
       "rutas": [
         {
-          "prefijo": "10.31.10.0/24",
-          "siguiente_salto": "10.31.255.2",
-          "via": "R2",
-          "descripcion": "RED 1"
-        },
-        {
-          "prefijo": "10.31.20.0/24",
-          "siguiente_salto": "10.31.255.2",
-          "via": "R2",
-          "descripcion": "RED 2"
-        },
-        {
-          "prefijo": "10.31.30.0/24",
-          "siguiente_salto": "10.31.255.2",
-          "via": "R2",
-          "descripcion": "RED 3"
-        },
-        {
-          "prefijo": "10.31.40.0/24",
-          "siguiente_salto": "10.31.255.2",
-          "via": "R2",
-          "descripcion": "RED 4"
-        },
-        {
-          "prefijo": "10.31.255.8/29",
-          "siguiente_salto": "10.31.255.2",
+          "prefijo": "10.0.2.0/24",
+          "siguiente_salto": "10.0.1.2",
           "via": "R2",
           "descripcion": "Enlace R2-R3"
         },
         {
-          "prefijo": "10.31.255.16/29",
-          "siguiente_salto": "10.31.255.2",
+          "prefijo": "10.0.3.0/24",
+          "siguiente_salto": "10.0.1.2",
           "via": "R2",
           "descripcion": "Enlace R2-R4"
+        },
+        {
+          "prefijo": "192.168.1.0/24",
+          "siguiente_salto": "10.0.1.2",
+          "via": "R2",
+          "descripcion": "RED 1"
+        },
+        {
+          "prefijo": "192.168.2.0/24",
+          "siguiente_salto": "10.0.1.2",
+          "via": "R2",
+          "descripcion": "RED 2"
+        },
+        {
+          "prefijo": "192.168.3.0/24",
+          "siguiente_salto": "10.0.1.2",
+          "via": "R2",
+          "descripcion": "RED 3"
+        },
+        {
+          "prefijo": "192.168.4.0/24",
+          "siguiente_salto": "10.0.1.2",
+          "via": "R2",
+          "descripcion": "RED 4"
         }
       ]
     },
@@ -139,40 +138,40 @@
       "rol": "router de nucleo",
       "router_id": "2.2.2.2",
       "interfaces": {
-        "enlace_r1_r2": "10.31.255.2",
-        "enlace_r2_r3": "10.31.255.9",
-        "enlace_r2_r4": "10.31.255.17"
+        "enlace_r1_r2": "10.0.1.2",
+        "enlace_r2_r3": "10.0.2.1",
+        "enlace_r2_r4": "10.0.3.1"
       },
       "rutas": [
         {
-          "prefijo": "10.31.10.0/24",
-          "siguiente_salto": "10.31.255.10",
+          "prefijo": "10.0.0.0/24",
+          "siguiente_salto": "10.0.1.1",
+          "via": "R1",
+          "descripcion": "LAN del servidor (servidor-R1)"
+        },
+        {
+          "prefijo": "192.168.1.0/24",
+          "siguiente_salto": "10.0.2.2",
           "via": "R3",
           "descripcion": "RED 1"
         },
         {
-          "prefijo": "10.31.20.0/24",
-          "siguiente_salto": "10.31.255.10",
+          "prefijo": "192.168.2.0/24",
+          "siguiente_salto": "10.0.2.2",
           "via": "R3",
           "descripcion": "RED 2"
         },
         {
-          "prefijo": "10.31.30.0/24",
-          "siguiente_salto": "10.31.255.18",
+          "prefijo": "192.168.3.0/24",
+          "siguiente_salto": "10.0.3.2",
           "via": "R4",
           "descripcion": "RED 3"
         },
         {
-          "prefijo": "10.31.40.0/24",
-          "siguiente_salto": "10.31.255.18",
+          "prefijo": "192.168.4.0/24",
+          "siguiente_salto": "10.0.3.2",
           "via": "R4",
           "descripcion": "RED 4"
-        },
-        {
-          "prefijo": "10.31.100.0/24",
-          "siguiente_salto": "10.31.255.1",
-          "via": "R1",
-          "descripcion": "LAN del servidor (CPD)"
         }
       ]
     },
@@ -180,40 +179,40 @@
       "rol": "router de acceso de RED 1 y RED 2",
       "router_id": "3.3.3.3",
       "interfaces": {
-        "enlace_r2_r3": "10.31.255.10",
-        "vlan10_red1": "10.31.10.1",
-        "vlan20_red2": "10.31.20.1"
+        "enlace_r2_r3": "10.0.2.2",
+        "vlan10_red1": "192.168.1.1",
+        "vlan20_red2": "192.168.2.1"
       },
       "rutas": [
         {
-          "prefijo": "10.31.30.0/24",
-          "siguiente_salto": "10.31.255.9",
+          "prefijo": "10.0.0.0/24",
+          "siguiente_salto": "10.0.2.1",
           "via": "R2",
-          "descripcion": "RED 3"
+          "descripcion": "LAN del servidor (servidor-R1)"
         },
         {
-          "prefijo": "10.31.40.0/24",
-          "siguiente_salto": "10.31.255.9",
-          "via": "R2",
-          "descripcion": "RED 4"
-        },
-        {
-          "prefijo": "10.31.100.0/24",
-          "siguiente_salto": "10.31.255.9",
-          "via": "R2",
-          "descripcion": "LAN del servidor (CPD)"
-        },
-        {
-          "prefijo": "10.31.255.0/29",
-          "siguiente_salto": "10.31.255.9",
+          "prefijo": "10.0.1.0/24",
+          "siguiente_salto": "10.0.2.1",
           "via": "R2",
           "descripcion": "Enlace R1-R2"
         },
         {
-          "prefijo": "10.31.255.16/29",
-          "siguiente_salto": "10.31.255.9",
+          "prefijo": "10.0.3.0/24",
+          "siguiente_salto": "10.0.2.1",
           "via": "R2",
           "descripcion": "Enlace R2-R4"
+        },
+        {
+          "prefijo": "192.168.3.0/24",
+          "siguiente_salto": "10.0.2.1",
+          "via": "R2",
+          "descripcion": "RED 3"
+        },
+        {
+          "prefijo": "192.168.4.0/24",
+          "siguiente_salto": "10.0.2.1",
+          "via": "R2",
+          "descripcion": "RED 4"
         }
       ]
     },
@@ -221,40 +220,40 @@
       "rol": "router de acceso de RED 3 y RED 4",
       "router_id": "4.4.4.4",
       "interfaces": {
-        "enlace_r2_r4": "10.31.255.18",
-        "vlan30_red3": "10.31.30.1",
-        "vlan40_red4": "10.31.40.1"
+        "enlace_r2_r4": "10.0.3.2",
+        "vlan30_red3": "192.168.3.1",
+        "vlan40_red4": "192.168.4.1"
       },
       "rutas": [
         {
-          "prefijo": "10.31.10.0/24",
-          "siguiente_salto": "10.31.255.17",
+          "prefijo": "10.0.0.0/24",
+          "siguiente_salto": "10.0.3.1",
           "via": "R2",
-          "descripcion": "RED 1"
+          "descripcion": "LAN del servidor (servidor-R1)"
         },
         {
-          "prefijo": "10.31.20.0/24",
-          "siguiente_salto": "10.31.255.17",
-          "via": "R2",
-          "descripcion": "RED 2"
-        },
-        {
-          "prefijo": "10.31.100.0/24",
-          "siguiente_salto": "10.31.255.17",
-          "via": "R2",
-          "descripcion": "LAN del servidor (CPD)"
-        },
-        {
-          "prefijo": "10.31.255.0/29",
-          "siguiente_salto": "10.31.255.17",
+          "prefijo": "10.0.1.0/24",
+          "siguiente_salto": "10.0.3.1",
           "via": "R2",
           "descripcion": "Enlace R1-R2"
         },
         {
-          "prefijo": "10.31.255.8/29",
-          "siguiente_salto": "10.31.255.17",
+          "prefijo": "10.0.2.0/24",
+          "siguiente_salto": "10.0.3.1",
           "via": "R2",
           "descripcion": "Enlace R2-R3"
+        },
+        {
+          "prefijo": "192.168.1.0/24",
+          "siguiente_salto": "10.0.3.1",
+          "via": "R2",
+          "descripcion": "RED 1"
+        },
+        {
+          "prefijo": "192.168.2.0/24",
+          "siguiente_salto": "10.0.3.1",
+          "via": "R2",
+          "descripcion": "RED 2"
         }
       ]
     }
@@ -262,48 +261,56 @@
   "servidor": {
     "nombre": "servidor",
     "red": "vlan100_servidor",
-    "ip": "10.31.100.10",
+    "ip": "10.0.0.2",
     "router": "R1",
-    "gateway": "10.31.100.1",
-    "red_interna": "10.31.0.0/16"
+    "gateway": "10.0.0.1",
+    "rutas": [
+      "10.0.1.0/24",
+      "10.0.2.0/24",
+      "10.0.3.0/24",
+      "192.168.1.0/24",
+      "192.168.2.0/24",
+      "192.168.3.0/24",
+      "192.168.4.0/24"
+    ]
   },
   "hosts": [
     {
       "nombre": "red1-pc1",
       "red": "vlan10_red1",
       "lan": "RED 1",
-      "ip": "10.31.10.10",
+      "ip": "192.168.1.10",
       "router": "R3",
-      "gateway": "10.31.10.1"
+      "gateway": "192.168.1.1"
     },
     {
       "nombre": "red2-pc1",
       "red": "vlan20_red2",
       "lan": "RED 2",
-      "ip": "10.31.20.10",
+      "ip": "192.168.2.10",
       "router": "R3",
-      "gateway": "10.31.20.1"
+      "gateway": "192.168.2.1"
     },
     {
       "nombre": "red3-pc1",
       "red": "vlan30_red3",
       "lan": "RED 3",
-      "ip": "10.31.30.10",
+      "ip": "192.168.3.10",
       "router": "R4",
-      "gateway": "10.31.30.1"
+      "gateway": "192.168.3.1"
     },
     {
       "nombre": "red4-pc1",
       "red": "vlan40_red4",
       "lan": "RED 4",
-      "ip": "10.31.40.10",
+      "ip": "192.168.4.10",
       "router": "R4",
-      "gateway": "10.31.40.1"
+      "gateway": "192.168.4.1"
     }
   ],
   "fluentd": {
     "nombre": "fluentd",
     "red": "gestion",
-    "ip": "10.31.200.10"
+    "ip": "10.0.200.10"
   }
 }

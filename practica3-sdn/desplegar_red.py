@@ -24,6 +24,11 @@ le pide, la DESPLIEGA y ejecuta el PLAN DE PRUEBAS:
                 |     |             |     |
               RED 1 RED 2         RED 3 RED 4
 
+  Direccionamiento (el mismo que la práctica 2; tabla PLAN_REDES más abajo):
+    servidor-R1 10.0.0.0/24 · R1-R2 10.0.1.0/24 · R2-R3 10.0.2.0/24 · R2-R4 10.0.3.0/24
+    RED 1..4    192.168.1.0/24 ... 192.168.4.0/24
+    El router tiene siempre la .1 de cada LAN; el servidor la .2 y los PCs la .10.
+
   * Routers (R1..R4): Ubuntu 22.04 + FRR (Free Range Routing) con rutas
     estáticas (o OSPF con --ospf). FRR escribe su log en un volumen compartido.
   * Servidor: al arrancar clona https://github.com/gisai/SSR-master-server,
@@ -41,12 +46,13 @@ Uso:
 
 Opciones de 'generar' y 'desplegar':
   --hosts N        número de PCs en cada RED (por defecto 1)
-  --base A.B       dos primeros octetos del direccionamiento (por defecto 10.31)
   --ospf           usar OSPF (enrutamiento dinámico) en vez de rutas estáticas
   --puerto-web P   puerto del anfitrión para acceder al servidor web (por defecto 3000)
   --repo URL       repositorio Git del servidor web (por defecto SSR-master-server)
   --docker-antiguo generar para Docker Engine < 28 (sin gateway_mode_ipv4; el
                    script lo detecta solo, esta opción fuerza ese modo)
+  --forzar         (desplegar) no comprobar si las subredes chocan con las
+                   redes del anfitrión
 
 Solo usa la biblioteca estándar de Python (3.7 o superior).
 """
@@ -75,45 +81,50 @@ REPO_SSR = "https://github.com/gisai/SSR-master-server.git"
 PUERTO_APP = 3000                          # puerto en el que escucha SSR-master-server
 REDES_PC = ["vlan10_red1", "vlan20_red2", "vlan30_red3", "vlan40_red4"]
 
+# -----------------------------------------------------------------------------
+# PLAN DE DIRECCIONAMIENTO (topología de la práctica). Para cambiar las IPs del
+# escenario basta con tocar esta tabla y volver a ejecutar el script.
+#   red Docker: (subred, descripción, etiqueta, tipo, VLAN, bridge en el anfitrión)
+# Los bridges de los enlaces NO se llaman br-r1-r2... a propósito: así no chocan
+# con los bridges de libvirt de la práctica 2 si siguen creados en la máquina.
+# -----------------------------------------------------------------------------
+PLAN_REDES = {
+    "vlan100_servidor": ("10.0.0.0/24", "LAN del servidor (servidor-R1)", "LAN-servidor-VLAN100", "lan", 100, "br-vlan100"),
+    "enlace_r1_r2": ("10.0.1.0/24", "Enlace R1-R2", "enlace-R1-R2", "enlace", None, "br-enlace12"),
+    "enlace_r2_r3": ("10.0.2.0/24", "Enlace R2-R3", "enlace-R2-R3", "enlace", None, "br-enlace23"),
+    "enlace_r2_r4": ("10.0.3.0/24", "Enlace R2-R4", "enlace-R2-R4", "enlace", None, "br-enlace24"),
+    "vlan10_red1": ("192.168.1.0/24", "RED 1", "RED1-VLAN10", "lan", 10, "br-vlan10"),
+    "vlan20_red2": ("192.168.2.0/24", "RED 2", "RED2-VLAN20", "lan", 20, "br-vlan20"),
+    "vlan30_red3": ("192.168.3.0/24", "RED 3", "RED3-VLAN30", "lan", 30, "br-vlan30"),
+    "vlan40_red4": ("192.168.4.0/24", "RED 4", "RED4-VLAN40", "lan", 40, "br-vlan40"),
+    "gestion": ("10.0.200.0/24", "Red de gestion (fluentd), no enrutada", "gestion", "gestion", None, "br-gestion"),
+}
+HOST_SERVIDOR = 2      # el servidor es la .2 de su LAN (R1 es la .1)
+PRIMER_PC = 10         # los PCs de cada RED empiezan en la .10
+HOST_FLUENTD = 10      # fluentd es la .10 de la red de gestión
+
 
 # =============================================================================
 # 1. TOPOLOGÍA Y PLAN DE NUMERACIÓN
 # =============================================================================
-def construir_topologia(base="10.31", hosts_por_red=1, ospf=False,
-                        puerto_web=3000, repo=REPO_SSR, modo_gateway="nat-unprotected"):
+def construir_topologia(hosts_por_red=1, ospf=False, puerto_web=3000,
+                        repo=REPO_SSR, modo_gateway="nat-unprotected"):
     """Devuelve un diccionario con redes, routers, servidor, PCs y fluentd.
 
-    Plan de numeración (base por defecto 10.31.0.0/16):
-      - LAN de cada switch con VLAN: tercer octeto = identificador de VLAN
-        (VLAN10 -> 10.31.10.0/24, ..., VLAN100 -> 10.31.100.0/24).
-      - Enlaces entre routers: /29 dentro de 10.31.255.0/24.
-      - El router es siempre la primera IP (.1) de cada LAN; la última IP útil
-        (.254 en las /24) la usa el anfitrión Docker como pasarela del bridge.
+    Plan de numeración (tabla PLAN_REDES):
+      - servidor-R1 10.0.0.0/24, enlaces R1-R2/R2-R3/R2-R4 10.0.1-3.0/24.
+      - RED 1..4: 192.168.1.0/24 ... 192.168.4.0/24 (una por switch con VLAN).
+      - El router tiene la .1 de cada LAN; en los enlaces, el router de arriba
+        la .1 y el de abajo la .2. La última IP útil (.254) la usa el anfitrión
+        Docker como pasarela del bridge.
     """
-
-    def red(prefijo, descripcion, etiqueta, tipo, vlan=None, bridge=None):
+    redes = {}
+    for nombre, (prefijo, descripcion, etiqueta, tipo, vlan, bridge) in PLAN_REDES.items():
         net = ipaddress.ip_network(prefijo)
-        return {"prefijo": str(net), "descripcion": descripcion,
-                "etiqueta": etiqueta, "tipo": tipo, "vlan": vlan,
-                "bridge": bridge or ("br-vlan%d" % vlan),
-                "gateway_docker": str(net.broadcast_address - 1)}
-
-    redes = {
-        "vlan100_servidor": red(base + ".100.0/24", "LAN del servidor (CPD)",
-                                "LAN-servidor-VLAN100", "lan", 100),
-        "enlace_r1_r2": red(base + ".255.0/29", "Enlace R1-R2", "enlace-R1-R2",
-                            "enlace", bridge="br-r1-r2"),
-        "enlace_r2_r3": red(base + ".255.8/29", "Enlace R2-R3", "enlace-R2-R3",
-                            "enlace", bridge="br-r2-r3"),
-        "enlace_r2_r4": red(base + ".255.16/29", "Enlace R2-R4", "enlace-R2-R4",
-                            "enlace", bridge="br-r2-r4"),
-        "vlan10_red1": red(base + ".10.0/24", "RED 1", "RED1-VLAN10", "lan", 10),
-        "vlan20_red2": red(base + ".20.0/24", "RED 2", "RED2-VLAN20", "lan", 20),
-        "vlan30_red3": red(base + ".30.0/24", "RED 3", "RED3-VLAN30", "lan", 30),
-        "vlan40_red4": red(base + ".40.0/24", "RED 4", "RED4-VLAN40", "lan", 40),
-        "gestion": red(base + ".200.0/24", "Red de gestion (fluentd), no enrutada",
-                       "gestion", "gestion", bridge="br-gestion"),
-    }
+        redes[nombre] = {"prefijo": str(net), "descripcion": descripcion,
+                         "etiqueta": etiqueta, "tipo": tipo, "vlan": vlan,
+                         "bridge": bridge,
+                         "gateway_docker": str(net.broadcast_address - 1)}
 
     def ip(nombre_red, n):
         return str(ipaddress.ip_network(redes[nombre_red]["prefijo"]).network_address + n)
@@ -137,25 +148,29 @@ def construir_topologia(base="10.31", hosts_por_red=1, ospf=False,
                            "interfaces": {r: ip(r, n) for r, n in lista},
                            "rutas": []}
 
+    # El servidor llega a cada una de las demás redes de la práctica a través de R1
+    # (no hay un prefijo que las agrupe a todas: 10.0.x.0 y 192.168.x.0).
     servidor = {"nombre": "servidor", "red": "vlan100_servidor",
-                "ip": ip("vlan100_servidor", 10), "router": "R1",
+                "ip": ip("vlan100_servidor", HOST_SERVIDOR), "router": "R1",
                 "gateway": routers["R1"]["interfaces"]["vlan100_servidor"],
-                "red_interna": base + ".0.0/16"}
+                "rutas": [d["prefijo"] for n, d in redes.items()
+                          if d["tipo"] != "gestion" and n != "vlan100_servidor"]}
 
     hosts = []
     for i, nombre_red in enumerate(REDES_PC, start=1):
         router = next(r for r, d in routers.items() if nombre_red in d["interfaces"])
         for j in range(1, hosts_por_red + 1):
             hosts.append({"nombre": "red%d-pc%d" % (i, j), "red": nombre_red,
-                          "lan": "RED %d" % i, "ip": ip(nombre_red, 9 + j),
+                          "lan": "RED %d" % i, "ip": ip(nombre_red, PRIMER_PC + j - 1),
                           "router": router,
                           "gateway": routers[router]["interfaces"][nombre_red]})
 
-    topo = {"base": base, "ospf": ospf, "puerto_web": puerto_web, "repo": repo,
+    topo = {"ospf": ospf, "puerto_web": puerto_web, "repo": repo,
             "hosts_por_red": hosts_por_red, "modo_gateway": modo_gateway,
             "redes": redes, "routers": routers,
             "servidor": servidor, "hosts": hosts,
-            "fluentd": {"nombre": "fluentd", "red": "gestion", "ip": ip("gestion", 10)}}
+            "fluentd": {"nombre": "fluentd", "red": "gestion",
+                        "ip": ip("gestion", HOST_FLUENTD)}}
     calcular_rutas(topo)
     return topo
 
@@ -222,22 +237,27 @@ def camino_esperado(topo, host):
 
 
 def esquema_ascii(topo):
-    b = topo["base"]
+    red, R = topo["redes"], topo["routers"]
+
+    def ult(router, n):  # último octeto de la IP de un router en una red
+        return "." + R[router]["interfaces"][n].split(".")[-1]
+
+    lans = [red[n]["prefijo"].split("/")[0] for n in REDES_PC]
     return "\n".join([
-        "                        [ servidor ]  .10",
-        "                              |          VLAN100   %s.100.0/24" % b,
-        "                          .1 (R1)",
-        "                              | .1       enlace    %s.255.0/29" % b,
-        "                          .2 (R2)",
-        "                   .9 +-------+-------+ .17",
-        "                      |               |  enlaces   %s.255.8/29  (R2-R3)" % b,
-        "                  .10 |               | .18        %s.255.16/29 (R2-R4)" % b,
+        "                        [ servidor ]  %s" % topo["servidor"]["ip"],
+        "                              |          VLAN100   %s" % red["vlan100_servidor"]["prefijo"],
+        "                          %s (R1)" % ult("R1", "vlan100_servidor"),
+        "                              | %-8s enlace    %s" % (ult("R1", "enlace_r1_r2"), red["enlace_r1_r2"]["prefijo"]),
+        "                          %s (R2)" % ult("R2", "enlace_r1_r2"),
+        "                   %3s +-------+-------+ %s" % (ult("R2", "enlace_r2_r3"), ult("R2", "enlace_r2_r4")),
+        "                       |               |  enlaces   %s (R2-R3)" % red["enlace_r2_r3"]["prefijo"],
+        "                   %3s |               | %-10s %s (R2-R4)" % (ult("R3", "enlace_r2_r3"), ult("R4", "enlace_r2_r4"), red["enlace_r2_r4"]["prefijo"]),
         "                    (R3)            (R4)",
         "                 .1 /   \\ .1     .1 /   \\ .1",
         "          [SW VLAN10] [SW VLAN20] [SW VLAN30] [SW VLAN40]",
         "             RED 1       RED 2       RED 3       RED 4",
-        "          %-12s%-12s%-12s%s" % (".10.0/24", ".20.0/24", ".30.0/24", ".40.0/24"),
-        "          (prefijo %s; PCs desde la .10)" % b,
+        "          %-12s%-12s%-12s%s" % tuple(lans),
+        "          (todas /24; router .1, PCs desde la .%d)" % PRIMER_PC,
     ])
 
 
@@ -381,8 +401,11 @@ echo "[servidor] Interfaces:"
 ip -br -4 addr show
 
 # 1) La ruta por defecto sigue apuntando al anfitrion Docker (salida a Internet
-#    para clonar el repositorio); las redes de la practica se alcanzan via R1.
-ip route replace "$RED_INTERNA" via "$ROUTER"
+#    para clonar el repositorio); el resto de redes de la practica (RUTAS) se
+#    alcanzan a traves de R1.
+for red in ${RUTAS:-}; do
+    ip route replace "$red" via "$ROUTER"
+done
 echo "[servidor] Tabla de rutas:"
 ip route
 
@@ -627,8 +650,9 @@ def generar_compose(topo):
     a("      - NET_ADMIN                    # para anadir la ruta hacia las redes de la practica")
     a("    environment:")
     a('      REPO_URL: "%s"' % topo["repo"])
-    a('      RED_INTERNA: "%s"            # todas las redes de la practica...' % srv["red_interna"])
-    a('      ROUTER: "%s"                # ...se alcanzan a traves de R1' % srv["gateway"])
+    a("      # el resto de redes de la practica se alcanzan a traves de R1")
+    a('      RUTAS: "%s"' % " ".join(srv["rutas"]))
+    a('      ROUTER: "%s"' % srv["gateway"])
     a("    ports:")
     a('      - "%d:%d"                    # acceso desde el anfitrion: http://localhost:%d'
       % (topo["puerto_web"], PUERTO_APP, topo["puerto_web"]))
@@ -766,8 +790,9 @@ def imprimir_plan(topo):
                       % (nombre, ruta["prefijo"], ruta["siguiente_salto"],
                          ruta["descripcion"], ruta["via"]))
     srv = topo["servidor"]
-    print("  servidor: ip route %s via %s   (por defecto: anfitrion Docker)"
-          % (srv["red_interna"], srv["gateway"]))
+    for prefijo in srv["rutas"]:
+        print("  servidor: ip route %-17s via %s (R1)" % (prefijo, srv["gateway"]))
+    print("  servidor: default via anfitrion Docker (salida a Internet)")
     for h in topo["hosts"]:
         print("  %s: default via %s (%s)" % (h["nombre"], h["gateway"], h["router"]))
     print()
@@ -859,8 +884,43 @@ def modo_gateway(args):
     return "nat-unprotected"
 
 
+def redes_del_anfitrion():
+    """Redes IPv4 de la tabla de rutas del anfitrión (solo Linux): [(interfaz, red)]."""
+    try:
+        with open("/proc/net/route") as f:
+            lineas = f.read().splitlines()[1:]
+    except OSError:
+        return []          # Windows / macOS: Docker va dentro de una VM, no hay choque
+    redes = []
+    for linea in lineas:
+        campos = linea.split()
+        if len(campos) < 8:
+            continue
+        destino = ipaddress.IPv4Address(int(campos[1], 16).to_bytes(4, sys.byteorder))
+        mascara = ipaddress.IPv4Address(int(campos[7], 16).to_bytes(4, sys.byteorder))
+        if int(mascara) == 0:
+            continue       # ruta por defecto
+        redes.append((campos[0], ipaddress.ip_network("%s/%s" % (destino, mascara), strict=False)))
+    return redes
+
+
+def comprobar_solapes(topo):
+    """Subredes del escenario que coinciden con redes que ya usa el anfitrión
+    (p. ej. una LAN 192.168.1.0/24 en casa). Se ignoran los bridges del propio
+    escenario, que existen si ya estaba desplegado."""
+    propios = {d["bridge"] for d in topo["redes"].values()}
+    choques = []
+    for interfaz, red_anfitrion in redes_del_anfitrion():
+        if interfaz in propios:
+            continue
+        for nombre, d in topo["redes"].items():
+            if red_anfitrion.overlaps(ipaddress.ip_network(d["prefijo"])):
+                choques.append((d["prefijo"], nombre, str(red_anfitrion), interfaz))
+    return choques
+
+
 def cmd_generar(args):
-    topo = construir_topologia(args.base, args.hosts, args.ospf, args.puerto_web,
+    topo = construir_topologia(args.hosts, args.ospf, args.puerto_web,
                                args.repo, modo_gateway(args))
     generar(topo)
     print("Escenario generado en %s" % DIR_ESC)
@@ -870,6 +930,15 @@ def cmd_generar(args):
 
 def cmd_desplegar(args):
     topo = cmd_generar(args)
+    choques = [] if args.forzar else comprobar_solapes(topo)
+    if choques:
+        print("ERROR: estas subredes del escenario ya se usan en el anfitrion:")
+        for prefijo, nombre, red_anfitrion, interfaz in choques:
+            print("  %-16s (%s)  choca con  %s en la interfaz %s" % (prefijo, nombre, red_anfitrion, interfaz))
+        print("Si se crea el bridge de Docker, el anfitrion puede perder la conexion con esa red.")
+        print("Cambia esa subred en PLAN_REDES (al principio del script) o, si sabes lo que")
+        print("haces, despliega con --forzar.")
+        return 1
     print("Construyendo imagenes y levantando el escenario (la primera vez tarda unos minutos)...")
     compose("up", "-d", "--build", "--remove-orphans")
     esperar_servidor()
@@ -949,13 +1018,14 @@ def cmd_probar(args):
     titulo("3. Rutas de los PCs y del servidor")
     _, salida = dexec("servidor", "ip", "route")
     informe.append("--- servidor$ ip route\n" + salida.rstrip())
-    prueba("servidor: %s via %s" % (srv["red_interna"], srv["gateway"]),
-           ("%s via %s" % (srv["red_interna"], srv["gateway"])) in salida)
+    for prefijo in srv["rutas"]:
+        patron = re.compile(r"^%s via %s\s" % (re.escape(prefijo), re.escape(srv["gateway"])), re.M)
+        prueba("servidor: %s via %s" % (prefijo, srv["gateway"]), bool(patron.search(salida)))
     for h in topo["hosts"]:
         _, salida = dexec(h["nombre"], "ip", "route")
         informe.append("--- %s$ ip route\n%s" % (h["nombre"], salida.rstrip()))
         prueba("%s: default via %s" % (h["nombre"], h["gateway"]),
-               ("default via %s" % h["gateway"]) in salida)
+               bool(re.search(r"^default via %s\s" % re.escape(h["gateway"]), salida, re.M)))
 
     # 4. Conectividad global (ping) ---------------------------------------
     titulo("4. Conectividad global (ping desde cada PC a servidor, routers y resto de PCs)")
@@ -1063,13 +1133,6 @@ def cmd_probar(args):
 # =============================================================================
 # 6. LÍNEA DE COMANDOS
 # =============================================================================
-def base_valida(texto):
-    m = re.fullmatch(r"(\d{1,3})\.(\d{1,3})", texto)
-    if not m or any(int(x) > 255 for x in m.groups()):
-        raise argparse.ArgumentTypeError("la base debe tener la forma A.B (p. ej. 10.31)")
-    return texto
-
-
 def main():
     p = argparse.ArgumentParser(description="Genera, despliega y prueba la red SDN con Docker Compose.")
     sub = p.add_subparsers(dest="orden")
@@ -1077,8 +1140,6 @@ def main():
     def opciones_topologia(sp):
         sp.add_argument("--hosts", type=int, default=1, choices=range(1, 21), metavar="N",
                         help="PCs por cada RED (1-20, por defecto 1)")
-        sp.add_argument("--base", type=base_valida, default="10.31",
-                        help="dos primeros octetos del direccionamiento (por defecto 10.31)")
         sp.add_argument("--ospf", action="store_true",
                         help="usar OSPF en lugar de rutas estaticas")
         sp.add_argument("--puerto-web", type=int, default=3000,
@@ -1090,6 +1151,8 @@ def main():
     sp = sub.add_parser("desplegar", help="genera, levanta el escenario y lo prueba (por defecto)")
     opciones_topologia(sp)
     sp.add_argument("--sin-pruebas", action="store_true", help="no ejecutar el plan de pruebas al final")
+    sp.add_argument("--forzar", action="store_true",
+                    help="no comprobar si las subredes chocan con las redes del anfitrion")
     sp = sub.add_parser("generar", help="solo genera los ficheros en ./escenario")
     opciones_topologia(sp)
     sub.add_parser("probar", help="ejecuta el plan de pruebas")

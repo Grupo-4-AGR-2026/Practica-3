@@ -2,25 +2,25 @@
 <rect width="100%" height="100%" fill="#ffffff"/>
 <style>.mono{font-family:"DejaVu Sans Mono",monospace}.t{fill:#1f2937}.s{fill:#4b5563}.ip{fill:#1d4ed8;font-weight:bold}.ln{stroke:#6b7280;stroke-width:2.2}.rol{fill:#6b7280;font-style:italic}</style>
 <text x="30" y="38" font-size="21" font-weight="bold" class="t">Plan de numeración · Práctica SDN con Docker</text>
-<text x="30" y="62" font-size="14" class="s">Direccionamiento 10.31.0.0/16 · tercer octeto de cada LAN = identificador de VLAN · rutas estáticas con FRR</text>
+<text x="30" y="62" font-size="14" class="s">Mismo direccionamiento que la práctica 2 · router .1 en cada LAN · rutas estáticas con FRR</text>
 <rect x="435" y="90" width="230" height="78" rx="8" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
 <text x="550" y="115" font-size="17" class="t" text-anchor="middle" font-weight="bold">servidor</text>
-<text x="550" y="137" font-size="15" class="ip mono" text-anchor="middle" >10.31.100.10</text>
+<text x="550" y="137" font-size="15" class="ip mono" text-anchor="middle" >10.0.0.2</text>
 <text x="550" y="157" font-size="12" class="s" text-anchor="middle" >SSR-master-server · Node.js :3000</text>
 <text x="680" y="120" font-size="12" class="s" text-anchor="start" >Anfitrión → http://localhost:3000</text>
 <text x="680" y="137" font-size="12" class="s" text-anchor="start" >(puerto publicado 3000:3000)</text>
 <rect x="860" y="170" width="215" height="74" rx="8" fill="#f9fafb" stroke="#9ca3af" stroke-dasharray="6 4" stroke-width="1.6"/>
 <text x="967" y="192" font-size="13" class="t" text-anchor="middle" font-weight="bold">fluentd (soporte)</text>
-<text x="967" y="211" font-size="12" class="mono s" text-anchor="middle" >10.31.200.10 · red gestión</text>
-<text x="967" y="230" font-size="12" class="mono s" text-anchor="middle" >10.31.200.0/24, no enrutada</text>
+<text x="967" y="211" font-size="12" class="mono s" text-anchor="middle" >10.0.200.10 · red gestión</text>
+<text x="967" y="230" font-size="12" class="mono s" text-anchor="middle" >10.0.200.0/24, no enrutada</text>
 <line x1="550" y1="168" x2="550" y2="224" class="ln"/>
-<text x="564" y="205" font-size="14" class="mono t" text-anchor="start" >VLAN 100 · 10.31.100.0/24</text>
+<text x="564" y="205" font-size="14" class="mono t" text-anchor="start" >VLAN 100 · 10.0.0.0/24</text>
 <text x="538" y="217" font-size="13" class="ip mono" text-anchor="end" >.1</text>
 <circle cx="550" cy="255" r="31" fill="#dbeafe" stroke="#1e3a8a" stroke-width="2.5"/>
 <text x="550" y="262" font-size="20" font-weight="bold" text-anchor="middle" fill="#1e3a8a">R1</text>
 <text x="506" y="260" font-size="13" text-anchor="end" class="rol">router del servidor</text>
 <line x1="550" y1="286" x2="550" y2="364" class="ln"/>
-<text x="564" y="330" font-size="14" class="mono t" text-anchor="start" >enlace 10.31.255.0/29</text>
+<text x="564" y="330" font-size="14" class="mono t" text-anchor="start" >enlace 10.0.1.0/24</text>
 <text x="538" y="305" font-size="13" class="ip mono" text-anchor="end" >.1</text>
 <text x="538" y="357" font-size="13" class="ip mono" text-anchor="end" >.2</text>
 <circle cx="550" cy="395" r="31" fill="#dbeafe" stroke="#1e3a8a" stroke-width="2.5"/>
@@ -28,12 +28,12 @@
 <text x="506" y="400" font-size="13" text-anchor="end" class="rol">router de núcleo</text>
 <line x1="528" y1="417" x2="322" y2="518" class="ln"/>
 <line x1="572" y1="417" x2="778" y2="518" class="ln"/>
-<text x="407" y="461" font-size="14" class="mono t" text-anchor="end" >enlace 10.31.255.8/29</text>
-<text x="693" y="461" font-size="14" class="mono t" text-anchor="start" >enlace 10.31.255.16/29</text>
-<text x="520" y="453" font-size="13" class="ip mono" text-anchor="end" >.9</text>
-<text x="580" y="453" font-size="13" class="ip mono" text-anchor="start" >.17</text>
-<text x="336" y="534" font-size="13" class="ip mono" text-anchor="start" >.10</text>
-<text x="764" y="534" font-size="13" class="ip mono" text-anchor="end" >.18</text>
+<text x="407" y="461" font-size="14" class="mono t" text-anchor="end" >enlace 10.0.2.0/24</text>
+<text x="693" y="461" font-size="14" class="mono t" text-anchor="start" >enlace 10.0.3.0/24</text>
+<text x="520" y="453" font-size="13" class="ip mono" text-anchor="end" >.1</text>
+<text x="580" y="453" font-size="13" class="ip mono" text-anchor="start" >.1</text>
+<text x="336" y="534" font-size="13" class="ip mono" text-anchor="start" >.2</text>
+<text x="764" y="534" font-size="13" class="ip mono" text-anchor="end" >.2</text>
 <circle cx="300" cy="540" r="31" fill="#dbeafe" stroke="#1e3a8a" stroke-width="2.5"/>
 <text x="300" y="547" font-size="20" font-weight="bold" text-anchor="middle" fill="#1e3a8a">R3</text>
 <text x="256" y="545" font-size="13" text-anchor="end" class="rol">router de acceso</text>
@@ -47,9 +47,9 @@
 <line x1="170" y1="694" x2="170" y2="715" class="ln"/>
 <rect x="65" y="715" width="210" height="112" rx="16" fill="#f0fdf4" stroke="#15803d" stroke-width="2"/>
 <text x="170" y="741" font-size="17" class="t" text-anchor="middle" font-weight="bold">RED 1</text>
-<text x="170" y="763" font-size="14" class="mono t" text-anchor="middle" >10.31.10.0/24</text>
-<text x="170" y="785" font-size="12" class="mono s" text-anchor="middle" >puerta de enlace 10.31.10.1</text>
-<text x="170" y="805" font-size="12" class="mono s" text-anchor="middle" >red1-pc1 10.31.10.10</text>
+<text x="170" y="763" font-size="14" class="mono t" text-anchor="middle" >192.168.1.0/24</text>
+<text x="170" y="785" font-size="12" class="mono s" text-anchor="middle" >router 192.168.1.1 (R3)</text>
+<text x="170" y="805" font-size="12" class="mono s" text-anchor="middle" >red1-pc1 192.168.1.10</text>
 <line x1="318" y1="566" x2="430" y2="660" class="ln"/>
 <text x="379" y="592" font-size="13" class="ip mono" text-anchor="start" >.1</text>
 <rect x="368" y="660" width="124" height="34" rx="5" fill="#e5e7eb" stroke="#374151" stroke-width="1.8"/>
@@ -57,9 +57,9 @@
 <line x1="430" y1="694" x2="430" y2="715" class="ln"/>
 <rect x="325" y="715" width="210" height="112" rx="16" fill="#f0fdf4" stroke="#15803d" stroke-width="2"/>
 <text x="430" y="741" font-size="17" class="t" text-anchor="middle" font-weight="bold">RED 2</text>
-<text x="430" y="763" font-size="14" class="mono t" text-anchor="middle" >10.31.20.0/24</text>
-<text x="430" y="785" font-size="12" class="mono s" text-anchor="middle" >puerta de enlace 10.31.20.1</text>
-<text x="430" y="805" font-size="12" class="mono s" text-anchor="middle" >red2-pc1 10.31.20.10</text>
+<text x="430" y="763" font-size="14" class="mono t" text-anchor="middle" >192.168.2.0/24</text>
+<text x="430" y="785" font-size="12" class="mono s" text-anchor="middle" >router 192.168.2.1 (R3)</text>
+<text x="430" y="805" font-size="12" class="mono s" text-anchor="middle" >red2-pc1 192.168.2.10</text>
 <line x1="782" y1="566" x2="670" y2="660" class="ln"/>
 <text x="721" y="592" font-size="13" class="ip mono" text-anchor="end" >.1</text>
 <rect x="608" y="660" width="124" height="34" rx="5" fill="#e5e7eb" stroke="#374151" stroke-width="1.8"/>
@@ -67,9 +67,9 @@
 <line x1="670" y1="694" x2="670" y2="715" class="ln"/>
 <rect x="565" y="715" width="210" height="112" rx="16" fill="#f0fdf4" stroke="#15803d" stroke-width="2"/>
 <text x="670" y="741" font-size="17" class="t" text-anchor="middle" font-weight="bold">RED 3</text>
-<text x="670" y="763" font-size="14" class="mono t" text-anchor="middle" >10.31.30.0/24</text>
-<text x="670" y="785" font-size="12" class="mono s" text-anchor="middle" >puerta de enlace 10.31.30.1</text>
-<text x="670" y="805" font-size="12" class="mono s" text-anchor="middle" >red3-pc1 10.31.30.10</text>
+<text x="670" y="763" font-size="14" class="mono t" text-anchor="middle" >192.168.3.0/24</text>
+<text x="670" y="785" font-size="12" class="mono s" text-anchor="middle" >router 192.168.3.1 (R4)</text>
+<text x="670" y="805" font-size="12" class="mono s" text-anchor="middle" >red3-pc1 192.168.3.10</text>
 <line x1="818" y1="566" x2="930" y2="660" class="ln"/>
 <text x="879" y="592" font-size="13" class="ip mono" text-anchor="start" >.1</text>
 <rect x="868" y="660" width="124" height="34" rx="5" fill="#e5e7eb" stroke="#374151" stroke-width="1.8"/>
@@ -77,11 +77,11 @@
 <line x1="930" y1="694" x2="930" y2="715" class="ln"/>
 <rect x="825" y="715" width="210" height="112" rx="16" fill="#f0fdf4" stroke="#15803d" stroke-width="2"/>
 <text x="930" y="741" font-size="17" class="t" text-anchor="middle" font-weight="bold">RED 4</text>
-<text x="930" y="763" font-size="14" class="mono t" text-anchor="middle" >10.31.40.0/24</text>
-<text x="930" y="785" font-size="12" class="mono s" text-anchor="middle" >puerta de enlace 10.31.40.1</text>
-<text x="930" y="805" font-size="12" class="mono s" text-anchor="middle" >red4-pc1 10.31.40.10</text>
+<text x="930" y="763" font-size="14" class="mono t" text-anchor="middle" >192.168.4.0/24</text>
+<text x="930" y="785" font-size="12" class="mono s" text-anchor="middle" >router 192.168.4.1 (R4)</text>
+<text x="930" y="805" font-size="12" class="mono s" text-anchor="middle" >red4-pc1 192.168.4.10</text>
 <text x="30" y="855" font-size="14" class="t" text-anchor="start" font-weight="bold">Notas</text>
-<text x="30" y="877" font-size="13" class="s" text-anchor="start" >· Cada switch con VLAN es una red bridge de Docker independiente (br-vlan10 … br-vlan100); los enlaces entre routers son /29.</text>
-<text x="30" y="897" font-size="13" class="s" text-anchor="start" >· El router usa siempre la primera IP (.1) de cada LAN; la última IP útil (.254 en las /24; .6, .14, .22 en los /29) es la del anfitrión Docker.</text>
-<text x="30" y="917" font-size="13" class="s" text-anchor="start" >· Servidor: ruta 10.31.0.0/16 vía 10.31.100.1 (R1); su ruta por defecto sale a Internet por el anfitrión para clonar el repositorio.</text>
+<text x="30" y="877" font-size="13" class="s" text-anchor="start" >· Cada switch con VLAN es una red bridge de Docker independiente (br-vlan10 … br-vlan40, br-vlan100); los enlaces son br-enlace12, br-enlace23 y br-enlace24.</text>
+<text x="30" y="897" font-size="13" class="s" text-anchor="start" >· El router usa la .1 de cada LAN (en los enlaces, .1 el de arriba y .2 el de abajo); la .254 de cada subred es la del anfitrión Docker.</text>
+<text x="30" y="917" font-size="13" class="s" text-anchor="start" >· Servidor: una ruta a cada red de la práctica vía 10.0.0.1 (R1); su ruta por defecto sale a Internet por el anfitrión para clonar el repositorio.</text>
 </svg>

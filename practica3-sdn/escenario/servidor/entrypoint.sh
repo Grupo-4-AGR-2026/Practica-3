@@ -14,8 +14,11 @@ echo "[servidor] Interfaces:"
 ip -br -4 addr show
 
 # 1) La ruta por defecto sigue apuntando al anfitrion Docker (salida a Internet
-#    para clonar el repositorio); las redes de la practica se alcanzan via R1.
-ip route replace "$RED_INTERNA" via "$ROUTER"
+#    para clonar el repositorio); el resto de redes de la practica (RUTAS) se
+#    alcanzan a traves de R1.
+for red in ${RUTAS:-}; do
+    ip route replace "$red" via "$ROUTER"
+done
 echo "[servidor] Tabla de rutas:"
 ip route
 

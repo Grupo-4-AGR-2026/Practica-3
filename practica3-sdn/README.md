@@ -60,12 +60,12 @@ Opciones de `desplegar` y `generar`:
 | Opción | Efecto |
 |---|---|
 | `--hosts N` | Número de PCs en cada RED (por defecto 1) |
-| `--base A.B` | Dos primeros octetos del direccionamiento (por defecto `10.31`) |
 | `--ospf` | Enrutamiento dinámico OSPF (área 0) en lugar de rutas estáticas |
 | `--puerto-web P` | Puerto del anfitrión para la web del servidor (por defecto 3000) |
 | `--repo URL` | Repositorio Git del servidor web |
 | `--docker-antiguo` | Genera el compose para Docker Engine < 28 (ver «Decisiones de diseño») |
 | `--sin-pruebas` | (`desplegar`) no ejecuta el plan de pruebas al final |
+| `--forzar` | (`desplegar`) no comprueba si las subredes chocan con las redes del anfitrión |
 
 También puedes levantarlo a mano, como en los apuntes: `cd escenario && docker compose up -d --build`.
 
@@ -80,24 +80,30 @@ También puedes levantarlo a mano, como en los apuntes: `cd escenario && docker 
 
 ## Plan de numeración
 
-Direccionamiento `10.31.0.0/16`. En las LAN el **tercer octeto es el identificador de VLAN**,
-el **router es siempre la `.1`** y la **última IP útil es la del anfitrión Docker** (pasarela
-del bridge). Los enlaces entre routers son `/29` dentro de `10.31.255.0/24`.
+Es el mismo direccionamiento de la práctica 2: `10.0.0.0/24` entre el servidor y R1,
+`10.0.1.0/24`, `10.0.2.0/24` y `10.0.3.0/24` en los enlaces entre routers y
+`192.168.1.0/24` … `192.168.4.0/24` en las cuatro REDs. El **router tiene siempre la `.1`**
+de cada LAN; en los enlaces, el router de arriba tiene la `.1` y el de abajo la `.2`. El
+servidor es la `.2` y los PCs empiezan en la `.10`. La **última IP útil (`.254`) es la del
+anfitrión Docker** (pasarela del bridge).
 
 | Red Docker | Bridge | Subred | VLAN | Anfitrión Docker | Equipos |
 |---|---|---|---|---|---|
-| `vlan100_servidor` | `br-vlan100` | 10.31.100.0/24 | 100 | 10.31.100.254 | R1 .1 · servidor .10 |
-| `enlace_r1_r2` | `br-r1-r2` | 10.31.255.0/29 | – | 10.31.255.6 | R1 .1 · R2 .2 |
-| `enlace_r2_r3` | `br-r2-r3` | 10.31.255.8/29 | – | 10.31.255.14 | R2 .9 · R3 .10 |
-| `enlace_r2_r4` | `br-r2-r4` | 10.31.255.16/29 | – | 10.31.255.22 | R2 .17 · R4 .18 |
-| `vlan10_red1` | `br-vlan10` | 10.31.10.0/24 | 10 | 10.31.10.254 | R3 .1 · red1-pc1 .10 |
-| `vlan20_red2` | `br-vlan20` | 10.31.20.0/24 | 20 | 10.31.20.254 | R3 .1 · red2-pc1 .10 |
-| `vlan30_red3` | `br-vlan30` | 10.31.30.0/24 | 30 | 10.31.30.254 | R4 .1 · red3-pc1 .10 |
-| `vlan40_red4` | `br-vlan40` | 10.31.40.0/24 | 40 | 10.31.40.254 | R4 .1 · red4-pc1 .10 |
-| `gestion` | `br-gestion` | 10.31.200.0/24 | – | 10.31.200.254 | fluentd .10 (no enrutada) |
+| `vlan100_servidor` | `br-vlan100` | 10.0.0.0/24 | 100 | 10.0.0.254 | R1 .1 · servidor .2 |
+| `enlace_r1_r2` | `br-enlace12` | 10.0.1.0/24 | – | 10.0.1.254 | R1 .1 · R2 .2 |
+| `enlace_r2_r3` | `br-enlace23` | 10.0.2.0/24 | – | 10.0.2.254 | R2 .1 · R3 .2 |
+| `enlace_r2_r4` | `br-enlace24` | 10.0.3.0/24 | – | 10.0.3.254 | R2 .1 · R4 .2 |
+| `vlan10_red1` | `br-vlan10` | 192.168.1.0/24 | 10 | 192.168.1.254 | R3 .1 · red1-pc1 .10 |
+| `vlan20_red2` | `br-vlan20` | 192.168.2.0/24 | 20 | 192.168.2.254 | R3 .1 · red2-pc1 .10 |
+| `vlan30_red3` | `br-vlan30` | 192.168.3.0/24 | 30 | 192.168.3.254 | R4 .1 · red3-pc1 .10 |
+| `vlan40_red4` | `br-vlan40` | 192.168.4.0/24 | 40 | 192.168.4.254 | R4 .1 · red4-pc1 .10 |
+| `gestion` | `br-gestion` | 10.0.200.0/24 | – | 10.0.200.254 | fluentd .10 (no enrutada) |
 
 Con `--hosts N` los PCs de cada RED toman las direcciones `.10`, `.11`, … y se llaman
 `redX-pc1`, `redX-pc2`, …
+
+Todo el plan está en la tabla `PLAN_REDES` al principio de `desplegar_red.py`: para cambiar
+una subred basta con editarla ahí y volver a ejecutar el script.
 
 ## Tablas de encaminamiento
 
@@ -105,54 +111,57 @@ Cada router conoce sus redes directamente conectadas y tiene una ruta estática 
 `staticd`) hacia cada una de las demás. Las rutas se escriben en `escenario/config/Rx/frr.conf`
 como `ip route <destino> <siguiente salto>`.
 
-**R1** (router del servidor) — conectadas: 10.31.100.0/24, 10.31.255.0/29
+**R1** (router del servidor) — conectadas: 10.0.0.0/24, 10.0.1.0/24
 
 | Destino | Siguiente salto | Por |
 |---|---|---|
-| 10.31.10.0/24 (RED 1) | 10.31.255.2 | R2 |
-| 10.31.20.0/24 (RED 2) | 10.31.255.2 | R2 |
-| 10.31.30.0/24 (RED 3) | 10.31.255.2 | R2 |
-| 10.31.40.0/24 (RED 4) | 10.31.255.2 | R2 |
-| 10.31.255.8/29 (enlace R2-R3) | 10.31.255.2 | R2 |
-| 10.31.255.16/29 (enlace R2-R4) | 10.31.255.2 | R2 |
+| 10.0.2.0/24 (enlace R2-R3) | 10.0.1.2 | R2 |
+| 10.0.3.0/24 (enlace R2-R4) | 10.0.1.2 | R2 |
+| 192.168.1.0/24 (RED 1) | 10.0.1.2 | R2 |
+| 192.168.2.0/24 (RED 2) | 10.0.1.2 | R2 |
+| 192.168.3.0/24 (RED 3) | 10.0.1.2 | R2 |
+| 192.168.4.0/24 (RED 4) | 10.0.1.2 | R2 |
 
-**R2** (router de núcleo) — conectadas: 10.31.255.0/29, 10.31.255.8/29, 10.31.255.16/29
-
-| Destino | Siguiente salto | Por |
-|---|---|---|
-| 10.31.10.0/24 (RED 1) | 10.31.255.10 | R3 |
-| 10.31.20.0/24 (RED 2) | 10.31.255.10 | R3 |
-| 10.31.30.0/24 (RED 3) | 10.31.255.18 | R4 |
-| 10.31.40.0/24 (RED 4) | 10.31.255.18 | R4 |
-| 10.31.100.0/24 (LAN del servidor) | 10.31.255.1 | R1 |
-
-**R3** (acceso RED 1 y RED 2) — conectadas: 10.31.255.8/29, 10.31.10.0/24, 10.31.20.0/24
+**R2** (router de núcleo) — conectadas: 10.0.1.0/24, 10.0.2.0/24, 10.0.3.0/24
 
 | Destino | Siguiente salto | Por |
 |---|---|---|
-| 10.31.30.0/24 (RED 3) | 10.31.255.9 | R2 |
-| 10.31.40.0/24 (RED 4) | 10.31.255.9 | R2 |
-| 10.31.100.0/24 (LAN del servidor) | 10.31.255.9 | R2 |
-| 10.31.255.0/29 (enlace R1-R2) | 10.31.255.9 | R2 |
-| 10.31.255.16/29 (enlace R2-R4) | 10.31.255.9 | R2 |
+| 10.0.0.0/24 (LAN del servidor) | 10.0.1.1 | R1 |
+| 192.168.1.0/24 (RED 1) | 10.0.2.2 | R3 |
+| 192.168.2.0/24 (RED 2) | 10.0.2.2 | R3 |
+| 192.168.3.0/24 (RED 3) | 10.0.3.2 | R4 |
+| 192.168.4.0/24 (RED 4) | 10.0.3.2 | R4 |
 
-**R4** (acceso RED 3 y RED 4) — conectadas: 10.31.255.16/29, 10.31.30.0/24, 10.31.40.0/24
+**R3** (acceso RED 1 y RED 2) — conectadas: 10.0.2.0/24, 192.168.1.0/24, 192.168.2.0/24
 
 | Destino | Siguiente salto | Por |
 |---|---|---|
-| 10.31.10.0/24 (RED 1) | 10.31.255.17 | R2 |
-| 10.31.20.0/24 (RED 2) | 10.31.255.17 | R2 |
-| 10.31.100.0/24 (LAN del servidor) | 10.31.255.17 | R2 |
-| 10.31.255.0/29 (enlace R1-R2) | 10.31.255.17 | R2 |
-| 10.31.255.8/29 (enlace R2-R3) | 10.31.255.17 | R2 |
+| 10.0.0.0/24 (LAN del servidor) | 10.0.2.1 | R2 |
+| 10.0.1.0/24 (enlace R1-R2) | 10.0.2.1 | R2 |
+| 10.0.3.0/24 (enlace R2-R4) | 10.0.2.1 | R2 |
+| 192.168.3.0/24 (RED 3) | 10.0.2.1 | R2 |
+| 192.168.4.0/24 (RED 4) | 10.0.2.1 | R2 |
+
+**R4** (acceso RED 3 y RED 4) — conectadas: 10.0.3.0/24, 192.168.3.0/24, 192.168.4.0/24
+
+| Destino | Siguiente salto | Por |
+|---|---|---|
+| 10.0.0.0/24 (LAN del servidor) | 10.0.3.1 | R2 |
+| 10.0.1.0/24 (enlace R1-R2) | 10.0.3.1 | R2 |
+| 10.0.2.0/24 (enlace R2-R3) | 10.0.3.1 | R2 |
+| 192.168.1.0/24 (RED 1) | 10.0.3.1 | R2 |
+| 192.168.2.0/24 (RED 2) | 10.0.3.1 | R2 |
 
 **Servidor y PCs** (los configura su `entrypoint.sh`):
 
 | Equipo | Rutas |
 |---|---|
-| servidor | `10.31.0.0/16 via 10.31.100.1` (R1) · por defecto: anfitrión Docker (salida a Internet) |
-| red1-pc1 / red2-pc1 | `default via 10.31.10.1` / `10.31.20.1` (R3) |
-| red3-pc1 / red4-pc1 | `default via 10.31.30.1` / `10.31.40.1` (R4) |
+| servidor | `10.0.1.0/24`, `10.0.2.0/24`, `10.0.3.0/24` y `192.168.1.0/24` … `192.168.4.0/24` vía `10.0.0.1` (R1) · por defecto: anfitrión Docker (salida a Internet) |
+| red1-pc1 / red2-pc1 | `default via 192.168.1.1` / `192.168.2.1` (R3) |
+| red3-pc1 / red4-pc1 | `default via 192.168.3.1` / `192.168.4.1` (R4) |
+
+Al no haber un prefijo que agrupe `10.0.x.0` y `192.168.x.0`, el servidor lleva una ruta
+por cada red, igual que en la práctica 2.
 
 Las tablas reales (`show ip route` de cada router e `ip route` de cada equipo) quedan
 copiadas en `escenario/resultados_pruebas.txt` después de ejecutar `probar`.
@@ -161,7 +170,7 @@ copiadas en `escenario/resultados_pruebas.txt` después de ejecutar `probar`.
 
 Al arrancar, el contenedor `servidor`:
 
-1. Añade la ruta `10.31.0.0/16 via 10.31.100.1` hacia las redes de la práctica.
+1. Añade las rutas hacia el resto de redes de la práctica vía R1 (`10.0.0.1`).
 2. **Clona** `https://github.com/gisai/SSR-master-server` (o hace `git pull` si el contenedor se reinicia).
 3. Instala las dependencias con `npm install`.
 4. Lo **ejecuta** con `node app.js` en el puerto 3000.
@@ -203,7 +212,7 @@ completo (con las tablas de rutas y los traceroute) en `escenario/resultados_pru
 | 2 | `show ip route` en R1–R4 | Cada ruta estática instalada (`S>*`) con su siguiente salto |
 | 3 | `ip route` en servidor y PCs | Ruta del servidor vía R1; ruta por defecto de cada PC vía su router |
 | 4 | Ping desde cada PC al servidor, a todas las interfaces de los routers y al resto de PCs | Todos los destinos alcanzables (conectividad global) |
-| 5 | `traceroute` desde cada RED al servidor | RED 1: `10.31.10.1 → 10.31.255.9 → 10.31.255.1 → 10.31.100.10` (RED 3/4 pasan por `.17`) |
+| 5 | `traceroute` desde cada RED al servidor | RED 1: `192.168.1.1 → 10.0.2.1 → 10.0.1.1 → 10.0.0.2` (RED 3/4 pasan por `10.0.3.1`) |
 | 6 | `curl http://servidor:3000/` y `/record` desde cada PC | HTTP 200 y el servidor guarda la medida |
 | 7 | `http://localhost:3000` desde el anfitrión | HTTP 200 |
 | 8 | Ficheros de FRR y de fluentd | Logs de R1–R4 en `shared-volume/frr` y recogidos en `output/frr`; salida de contenedores en `output/docker` |
@@ -234,7 +243,14 @@ docker exec R1 vtysh -c "show interface brief"
   error en las tablas quedaría oculto porque el anfitrión reenviaría el tráfico (lo demuestra
   la prueba 9).
 - **Servidor**: mantiene su ruta por defecto hacia el anfitrión para poder clonar de GitHub, y
-  llega a las redes de la práctica con la ruta `10.31.0.0/16` vía R1.
+  llega a cada una de las demás redes de la práctica con una ruta vía R1.
+- **Nombres de los bridges**: los enlaces se llaman `br-enlace12`, `br-enlace23` y `br-enlace24`
+  (no `br-r1-r2`…) para no reutilizar por error los bridges de libvirt de la práctica 2 si
+  siguen creados en la máquina.
+- **Comprobación de choques**: antes de desplegar, el script mira la tabla de rutas del
+  anfitrión (Linux) y se detiene si alguna subred del escenario ya está en uso (por ejemplo,
+  una red doméstica `192.168.1.0/24`), porque crear ese bridge podría dejar al anfitrión sin
+  conexión a su red.
 - **FRR**: nombre de router, *banner*, log en fichero con milisegundos y depuración de zebra,
   `ip forwarding` y descripción automática de cada interfaz (Docker decide el orden `ethX`,
   así que el script la busca por su IP).
@@ -250,8 +266,9 @@ docker exec R1 vtysh -c "show interface brief"
 |---|---|
 | `unknown gateway mode nat-unprotected` al crear las redes | Tienes Docker 27: `python3 desplegar_red.py --docker-antiguo` |
 | Aviso `the attribute version is obsolete` | Normal con Compose v2: se mantiene por compatibilidad con `docker-compose` v1 |
-| `Pool overlaps with other one on this address space` | Ya hay una red Docker o una red local con ese rango: usa `--base 10.32` |
-| Cambias `--base`, `--docker-antiguo` u otra opción que afecta a las redes | Ejecuta `python3 desplegar_red.py parar` antes de volver a desplegar, para que se creen de nuevo |
+| `ERROR: estas subredes del escenario ya se usan en el anfitrion` | Tu red local (o una red de libvirt/VirtualBox con IP en el anfitrión) usa ese rango. Cambia esa subred en `PLAN_REDES` o, si sabes que no afecta, usa `--forzar` |
+| `Pool overlaps with other one on this address space` | Otra red de Docker usa ese rango: `docker network ls` y bórrala, o cambia la subred en `PLAN_REDES` |
+| Vienes de la versión anterior del escenario o cambias `PLAN_REDES` / `--docker-antiguo` | Ejecuta `python3 desplegar_red.py parar` antes de volver a desplegar, para que las redes se creen de nuevo |
 | El puerto 3000 está ocupado | `--puerto-web 8080` y abre `http://localhost:8080` |
 | El servidor no llega a `healthy` | `docker logs servidor`: suele ser falta de acceso a GitHub o al registro de npm |
 | Los PCs no llegan al servidor | `docker exec R2 vtysh -c "show ip route"` y comprueba que no haya reglas `DROP` en `sudo iptables -t raw -S PREROUTING` (si las hay, `parar` y volver a `desplegar`) |

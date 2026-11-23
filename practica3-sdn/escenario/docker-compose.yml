@@ -2,20 +2,20 @@
 #  docker-compose.yml  -  GENERADO por desplegar_red.py
 #  (no editar a mano: cambia el script y ejecuta 'python3 desplegar_red.py generar')
 #
-#                          [ servidor ]  .10
-#                                |          VLAN100   10.31.100.0/24
+#                          [ servidor ]  10.0.0.2
+#                                |          VLAN100   10.0.0.0/24
 #                            .1 (R1)
-#                                | .1       enlace    10.31.255.0/29
+#                                | .1       enlace    10.0.1.0/24
 #                            .2 (R2)
-#                     .9 +-------+-------+ .17
-#                        |               |  enlaces   10.31.255.8/29  (R2-R3)
-#                    .10 |               | .18        10.31.255.16/29 (R2-R4)
+#                      .1 +-------+-------+ .1
+#                         |               |  enlaces   10.0.2.0/24 (R2-R3)
+#                      .2 |               | .2         10.0.3.0/24 (R2-R4)
 #                      (R3)            (R4)
 #                   .1 /   \ .1     .1 /   \ .1
 #            [SW VLAN10] [SW VLAN20] [SW VLAN30] [SW VLAN40]
 #               RED 1       RED 2       RED 3       RED 4
-#            .10.0/24    .20.0/24    .30.0/24    .40.0/24
-#            (prefijo 10.31; PCs desde la .10)
+#            192.168.1.0 192.168.2.0 192.168.3.0 192.168.4.0
+#            (todas /24; router .1, PCs desde la .10)
 #
 #  Enrutamiento: rutas estaticas con FRR (Free Range Routing)
 #  Logs: fluentd recoge el log de FRR de cada router y la salida de los contenedores
@@ -32,7 +32,7 @@ services:
     image: fluent/fluentd:v1.20-debian-1
     container_name: fluentd
     hostname: fluentd
-    user: root                       
+    user: root                       # para leer los logs de FRR y escribir en ./fluentd/output
     volumes:
       - ./fluentd/conf:/fluentd/etc:ro            # fluent.conf
       - ./fluentd/shared-volume:/shared-volume    # logs de FRR de los routers
@@ -41,13 +41,13 @@ services:
       - "127.0.0.1:24224:24224"     # aqui envia Docker la salida de los contenedores
     networks:
       gestion:
-        ipv4_address: 10.31.200.10
+        ipv4_address: 10.0.200.10
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
   # R1 - router del servidor
-  #   10.31.100.1     10.31.100.0/24     LAN del servidor (CPD)
-  #   10.31.255.1     10.31.255.0/29     Enlace R1-R2
+  #   10.0.0.1        10.0.0.0/24        LAN del servidor (servidor-R1)
+  #   10.0.1.1        10.0.1.0/24        Enlace R1-R2
   r1:
     build: ./router
     container_name: R1
@@ -59,7 +59,7 @@ services:
     environment:
       ROUTER_NAME: R1
       OSPF: "no"
-      DESCRIPCIONES: "10.31.100.1=LAN-servidor-VLAN100 10.31.255.1=enlace-R1-R2"
+      DESCRIPCIONES: "10.0.0.1=LAN-servidor-VLAN100 10.0.1.1=enlace-R1-R2"
     volumes:
       - ./config/R1:/config:ro                  # frr.conf de este router
       - ./fluentd/shared-volume:/shared-volume  # FRR escribe aqui su log (lo lee fluentd)
@@ -73,16 +73,16 @@ services:
         tag: "docker.R1"
     networks:
       vlan100_servidor:
-        ipv4_address: 10.31.100.1
+        ipv4_address: 10.0.0.1
       enlace_r1_r2:
-        ipv4_address: 10.31.255.1
+        ipv4_address: 10.0.1.1
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
   # R2 - router de nucleo
-  #   10.31.255.2     10.31.255.0/29     Enlace R1-R2
-  #   10.31.255.9     10.31.255.8/29     Enlace R2-R3
-  #   10.31.255.17    10.31.255.16/29    Enlace R2-R4
+  #   10.0.1.2        10.0.1.0/24        Enlace R1-R2
+  #   10.0.2.1        10.0.2.0/24        Enlace R2-R3
+  #   10.0.3.1        10.0.3.0/24        Enlace R2-R4
   r2:
     build: ./router
     container_name: R2
@@ -94,7 +94,7 @@ services:
     environment:
       ROUTER_NAME: R2
       OSPF: "no"
-      DESCRIPCIONES: "10.31.255.2=enlace-R1-R2 10.31.255.9=enlace-R2-R3 10.31.255.17=enlace-R2-R4"
+      DESCRIPCIONES: "10.0.1.2=enlace-R1-R2 10.0.2.1=enlace-R2-R3 10.0.3.1=enlace-R2-R4"
     volumes:
       - ./config/R2:/config:ro                  # frr.conf de este router
       - ./fluentd/shared-volume:/shared-volume  # FRR escribe aqui su log (lo lee fluentd)
@@ -108,18 +108,18 @@ services:
         tag: "docker.R2"
     networks:
       enlace_r1_r2:
-        ipv4_address: 10.31.255.2
+        ipv4_address: 10.0.1.2
       enlace_r2_r3:
-        ipv4_address: 10.31.255.9
+        ipv4_address: 10.0.2.1
       enlace_r2_r4:
-        ipv4_address: 10.31.255.17
+        ipv4_address: 10.0.3.1
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
   # R3 - router de acceso de RED 1 y RED 2
-  #   10.31.255.10    10.31.255.8/29     Enlace R2-R3
-  #   10.31.10.1      10.31.10.0/24      RED 1
-  #   10.31.20.1      10.31.20.0/24      RED 2
+  #   10.0.2.2        10.0.2.0/24        Enlace R2-R3
+  #   192.168.1.1     192.168.1.0/24     RED 1
+  #   192.168.2.1     192.168.2.0/24     RED 2
   r3:
     build: ./router
     container_name: R3
@@ -131,7 +131,7 @@ services:
     environment:
       ROUTER_NAME: R3
       OSPF: "no"
-      DESCRIPCIONES: "10.31.255.10=enlace-R2-R3 10.31.10.1=RED1-VLAN10 10.31.20.1=RED2-VLAN20"
+      DESCRIPCIONES: "10.0.2.2=enlace-R2-R3 192.168.1.1=RED1-VLAN10 192.168.2.1=RED2-VLAN20"
     volumes:
       - ./config/R3:/config:ro                  # frr.conf de este router
       - ./fluentd/shared-volume:/shared-volume  # FRR escribe aqui su log (lo lee fluentd)
@@ -145,18 +145,18 @@ services:
         tag: "docker.R3"
     networks:
       enlace_r2_r3:
-        ipv4_address: 10.31.255.10
+        ipv4_address: 10.0.2.2
       vlan10_red1:
-        ipv4_address: 10.31.10.1
+        ipv4_address: 192.168.1.1
       vlan20_red2:
-        ipv4_address: 10.31.20.1
+        ipv4_address: 192.168.2.1
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
   # R4 - router de acceso de RED 3 y RED 4
-  #   10.31.255.18    10.31.255.16/29    Enlace R2-R4
-  #   10.31.30.1      10.31.30.0/24      RED 3
-  #   10.31.40.1      10.31.40.0/24      RED 4
+  #   10.0.3.2        10.0.3.0/24        Enlace R2-R4
+  #   192.168.3.1     192.168.3.0/24     RED 3
+  #   192.168.4.1     192.168.4.0/24     RED 4
   r4:
     build: ./router
     container_name: R4
@@ -168,7 +168,7 @@ services:
     environment:
       ROUTER_NAME: R4
       OSPF: "no"
-      DESCRIPCIONES: "10.31.255.18=enlace-R2-R4 10.31.30.1=RED3-VLAN30 10.31.40.1=RED4-VLAN40"
+      DESCRIPCIONES: "10.0.3.2=enlace-R2-R4 192.168.3.1=RED3-VLAN30 192.168.4.1=RED4-VLAN40"
     volumes:
       - ./config/R4:/config:ro                  # frr.conf de este router
       - ./fluentd/shared-volume:/shared-volume  # FRR escribe aqui su log (lo lee fluentd)
@@ -182,11 +182,11 @@ services:
         tag: "docker.R4"
     networks:
       enlace_r2_r4:
-        ipv4_address: 10.31.255.18
+        ipv4_address: 10.0.3.2
       vlan30_red3:
-        ipv4_address: 10.31.30.1
+        ipv4_address: 192.168.3.1
       vlan40_red4:
-        ipv4_address: 10.31.40.1
+        ipv4_address: 192.168.4.1
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
@@ -201,8 +201,9 @@ services:
       - NET_ADMIN                    # para anadir la ruta hacia las redes de la practica
     environment:
       REPO_URL: "https://github.com/gisai/SSR-master-server.git"
-      RED_INTERNA: "10.31.0.0/16"            # todas las redes de la practica...
-      ROUTER: "10.31.100.1"                # ...se alcanzan a traves de R1
+      # el resto de redes de la practica se alcanzan a traves de R1
+      RUTAS: "10.0.1.0/24 10.0.2.0/24 10.0.3.0/24 192.168.1.0/24 192.168.2.0/24 192.168.3.0/24 192.168.4.0/24"
+      ROUTER: "10.0.0.1"
     ports:
       - "3000:3000"                    # acceso desde el anfitrion: http://localhost:3000
     depends_on:
@@ -222,11 +223,11 @@ services:
       start_period: 60s
     networks:
       vlan100_servidor:
-        ipv4_address: 10.31.100.10
+        ipv4_address: 10.0.0.2
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
-  # red1-pc1 - PC de RED 1 (switch VLAN10), puerta de enlace 10.31.10.1 (R3)
+  # red1-pc1 - PC de RED 1 (switch VLAN10), puerta de enlace 192.168.1.1 (R3)
   red1-pc1:
     build: ./host
     container_name: red1-pc1
@@ -235,18 +236,18 @@ services:
     cap_add:
       - NET_ADMIN                    # para cambiar la ruta por defecto
     environment:
-      GATEWAY: "10.31.10.1"
+      GATEWAY: "192.168.1.1"
     extra_hosts:
-      - "servidor:10.31.100.10"        # resolucion del nombre del servidor
+      - "servidor:10.0.0.2"        # resolucion del nombre del servidor
     depends_on:
       - r3
     networks:
       vlan10_red1:
-        ipv4_address: 10.31.10.10
+        ipv4_address: 192.168.1.10
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
-  # red2-pc1 - PC de RED 2 (switch VLAN20), puerta de enlace 10.31.20.1 (R3)
+  # red2-pc1 - PC de RED 2 (switch VLAN20), puerta de enlace 192.168.2.1 (R3)
   red2-pc1:
     build: ./host
     container_name: red2-pc1
@@ -255,18 +256,18 @@ services:
     cap_add:
       - NET_ADMIN                    # para cambiar la ruta por defecto
     environment:
-      GATEWAY: "10.31.20.1"
+      GATEWAY: "192.168.2.1"
     extra_hosts:
-      - "servidor:10.31.100.10"        # resolucion del nombre del servidor
+      - "servidor:10.0.0.2"        # resolucion del nombre del servidor
     depends_on:
       - r3
     networks:
       vlan20_red2:
-        ipv4_address: 10.31.20.10
+        ipv4_address: 192.168.2.10
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
-  # red3-pc1 - PC de RED 3 (switch VLAN30), puerta de enlace 10.31.30.1 (R4)
+  # red3-pc1 - PC de RED 3 (switch VLAN30), puerta de enlace 192.168.3.1 (R4)
   red3-pc1:
     build: ./host
     container_name: red3-pc1
@@ -275,18 +276,18 @@ services:
     cap_add:
       - NET_ADMIN                    # para cambiar la ruta por defecto
     environment:
-      GATEWAY: "10.31.30.1"
+      GATEWAY: "192.168.3.1"
     extra_hosts:
-      - "servidor:10.31.100.10"        # resolucion del nombre del servidor
+      - "servidor:10.0.0.2"        # resolucion del nombre del servidor
     depends_on:
       - r4
     networks:
       vlan30_red3:
-        ipv4_address: 10.31.30.10
+        ipv4_address: 192.168.3.10
     restart: unless-stopped
 
   # ------------------------------------------------------------------------
-  # red4-pc1 - PC de RED 4 (switch VLAN40), puerta de enlace 10.31.40.1 (R4)
+  # red4-pc1 - PC de RED 4 (switch VLAN40), puerta de enlace 192.168.4.1 (R4)
   red4-pc1:
     build: ./host
     container_name: red4-pc1
@@ -295,14 +296,14 @@ services:
     cap_add:
       - NET_ADMIN                    # para cambiar la ruta por defecto
     environment:
-      GATEWAY: "10.31.40.1"
+      GATEWAY: "192.168.4.1"
     extra_hosts:
-      - "servidor:10.31.100.10"        # resolucion del nombre del servidor
+      - "servidor:10.0.0.2"        # resolucion del nombre del servidor
     depends_on:
       - r4
     networks:
       vlan40_red4:
-        ipv4_address: 10.31.40.10
+        ipv4_address: 192.168.4.10
     restart: unless-stopped
 
 # ============================================================================
@@ -318,42 +319,42 @@ services:
 # (Docker 27 no acepta este valor: regenera con --docker-antiguo.)
 # ============================================================================
 networks:
-  vlan100_servidor:                     # LAN del servidor (CPD) (VLAN 100)
+  vlan100_servidor:                     # LAN del servidor (servidor-R1) (VLAN 100)
     driver: bridge
     driver_opts:
       com.docker.network.bridge.name: br-vlan100
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.100.0/24
-          gateway: 10.31.100.254
+        - subnet: 10.0.0.0/24
+          gateway: 10.0.0.254
   enlace_r1_r2:                     # Enlace R1-R2
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.name: br-r1-r2
+      com.docker.network.bridge.name: br-enlace12
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.255.0/29
-          gateway: 10.31.255.6
+        - subnet: 10.0.1.0/24
+          gateway: 10.0.1.254
   enlace_r2_r3:                     # Enlace R2-R3
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.name: br-r2-r3
+      com.docker.network.bridge.name: br-enlace23
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.255.8/29
-          gateway: 10.31.255.14
+        - subnet: 10.0.2.0/24
+          gateway: 10.0.2.254
   enlace_r2_r4:                     # Enlace R2-R4
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.name: br-r2-r4
+      com.docker.network.bridge.name: br-enlace24
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.255.16/29
-          gateway: 10.31.255.22
+        - subnet: 10.0.3.0/24
+          gateway: 10.0.3.254
   vlan10_red1:                     # RED 1 (VLAN 10)
     driver: bridge
     driver_opts:
@@ -361,8 +362,8 @@ networks:
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.10.0/24
-          gateway: 10.31.10.254
+        - subnet: 192.168.1.0/24
+          gateway: 192.168.1.254
   vlan20_red2:                     # RED 2 (VLAN 20)
     driver: bridge
     driver_opts:
@@ -370,8 +371,8 @@ networks:
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.20.0/24
-          gateway: 10.31.20.254
+        - subnet: 192.168.2.0/24
+          gateway: 192.168.2.254
   vlan30_red3:                     # RED 3 (VLAN 30)
     driver: bridge
     driver_opts:
@@ -379,8 +380,8 @@ networks:
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.30.0/24
-          gateway: 10.31.30.254
+        - subnet: 192.168.3.0/24
+          gateway: 192.168.3.254
   vlan40_red4:                     # RED 4 (VLAN 40)
     driver: bridge
     driver_opts:
@@ -388,8 +389,8 @@ networks:
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.40.0/24
-          gateway: 10.31.40.254
+        - subnet: 192.168.4.0/24
+          gateway: 192.168.4.254
   gestion:                     # Red de gestion (fluentd), no enrutada
     driver: bridge
     driver_opts:
@@ -397,5 +398,5 @@ networks:
       com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
     ipam:
       config:
-        - subnet: 10.31.200.0/24
-          gateway: 10.31.200.254
+        - subnet: 10.0.200.0/24
+          gateway: 10.0.200.254
